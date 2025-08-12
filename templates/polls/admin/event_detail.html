@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ event.title }} - Panel admina - Wysonda{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">
+                <i class="bi bi-calendar-event text-primary"></i>
+                {{ event.title }}
+            </h1>
+            <div class="btn-group">
+                <a href="{% url 'polls:admin_event_edit' event.id %}" class="btn btn-warning">
+                    <i class="bi bi-pencil"></i> Edytuj
+                </a>
+                <a href="{% url 'polls:admin_candidate_create' event.id %}" class="btn btn-success">
+                    <i class="bi bi-person-plus"></i> Dodaj kandydata
+                </a>
+                <a href="{% url 'polls:export_results' event.id %}" class="btn btn-info">
+                    <i class="bi bi-download"></i> Eksportuj
+                </a>
+                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteEventModal">
+                    <i class="bi bi-trash"></i> Usuń
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Informacje o wydarzeniu -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i> Informacje o wydarzeniu
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Typ:</strong> {{ event.get_event_type_display }}</p>
+                        <p><strong>Data:</strong> {{ event.event_date|date:"d.m.Y H:i" }}</p>
+                        <p><strong>Status:</strong> 
+                            {% if event.event_date > now %}
+                                {% if event.status == 'active' %}
+                                    <span class="badge bg-success">Aktywne</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Nadchodzące</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-secondary">Zakończone</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Kandydaci:</strong> {{ candidates.count }}</p>
+                        <p><strong>Głosy:</strong> {{ total_votes }}</p>
+                        <p><strong>Unikalni głosujący:</strong> {{ unique_voters }}</p>
+                    </div>
+                </div>
+                {% if event.description %}
+                    <hr>
+                    <p><strong>Opis:</strong></p>
+                    <p>{{ event.description }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-graph-up"></i> Statystyki
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center">
+                    <h3 class="text-primary">{{ total_votes }}</h3>
+                    <p class="text-muted">Wszystkie głosy</p>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <h3 class="text-success">{{ unique_voters }}</h3>
+                    <p class="text-muted">Unikalni głosujący</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kandydaci i wyniki -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-people"></i> Kandydaci i wyniki
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if results %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Pozycja</th>
+                                    <th>Kandydat</th>
+                                    <th>Głosy</th>
+                                    <th>Procent</th>
+                                    <th>Pasek postępu</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in results %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-primary">{{ forloop.counter }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                {% if result.candidate.photo %}
+                                                    <img src="{{ result.candidate.photo.url }}" 
+                                                         alt="{{ result.candidate.name }}" 
+                                                         class="rounded-circle me-2" 
+                                                         width="40" height="40">
+                                                {% else %}
+                                                    <div class="bg-secondary rounded-circle me-2 d-flex align-items-center justify-content-center" 
+                                                         style="width: 40px; height: 40px;">
+                                                        <i class="bi bi-person text-white"></i>
+                                                    </div>
+                                                {% endif %}
+                                                <div>
+                                                    <strong>{{ result.candidate.name }}</strong>
+                                                    {% if result.candidate.description %}
+                                                        <br><small class="text-muted">{{ result.candidate.description|truncatewords:10 }}</small>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <strong>{{ result.vote_count }}</strong>
+                                        </td>
+                                        <td>
+                                            <strong>{{ result.percentage }}%</strong>
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {{ result.percentage }}%"
+                                                     aria-valuenow="{{ result.percentage }}" 
+                                                     aria-valuemin="0" aria-valuemax="100">
+                                                    {{ result.percentage }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'polls:candidate_detail' result.candidate.id %}" 
+                                                   class="btn btn-outline-primary" title="Zobacz profil">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{% url 'polls:admin_candidate_edit' result.candidate.id %}" 
+                                                   class="btn btn-outline-warning" title="Edytuj">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-people display-1 text-muted"></i>
+                        <h5 class="mt-3">Brak kandydatów</h5>
+                        <p class="text-muted">Nie ma jeszcze żadnych kandydatów w tym wydarzeniu.</p>
+                        <a href="{% url 'polls:admin_candidate_create' event.id %}" class="btn btn-primary">
+                            <i class="bi bi-person-plus"></i> Dodaj pierwszego kandydata
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Przycisk powrotu -->
+<div class="row mt-4">
+    <div class="col-12">
+        <a href="{% url 'polls:admin_dashboard' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Powrót do panelu
+        </a>
+    </div>
+</div>
+
+<!-- Modal potwierdzenia usuwania -->
+<div class="modal fade" id="deleteEventModal" tabindex="-1" aria-labelledby="deleteEventModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteEventModalLabel">
+                    <i class="bi bi-exclamation-triangle text-danger"></i>
+                    Potwierdź usunięcie
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Czy na pewno chcesz usunąć wydarzenie <strong>"{{ event.title }}"</strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Uwaga!</strong> Ta operacja jest nieodwracalna. Zostaną również usunięte:
+                    <ul class="mb-0 mt-2">
+                        <li>Wszyscy kandydaci ({{ candidates.count }})</li>
+                        <li>Wszystkie głosy ({{ total_votes }})</li>
+                        <li>Wszystkie komentarze</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Anuluj
+                </button>
+                <form method="post" action="{% url 'polls:delete_event' event.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Usuń wydarzenie
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

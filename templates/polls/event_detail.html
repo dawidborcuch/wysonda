@@ -1,0 +1,379 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ event.title }} - Wysonda{% endblock %}
+
+{% block extra_css %}
+<style>
+    .candidate-card {
+        transition: transform 0.2s;
+    }
+    .candidate-card:hover {
+        transform: translateY(-2px);
+    }
+    .vote-button {
+        transition: all 0.3s;
+    }
+    .vote-button:hover {
+        transform: scale(1.05);
+    }
+    .results-bar {
+        transition: width 1s ease-in-out;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Event Header -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h1 class="card-title mb-0">{{ event.title }}</h1>
+                    <span class="badge bg-{% if event.event_date > now %}success{% else %}secondary{% endif %} fs-6">
+                        {% if event.event_date > now %}
+                            {% if event.status == 'active' %}Aktywny{% else %}Nadchodzący{% endif %}
+                        {% else %}
+                            Zakończony
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <p class="text-muted mb-3">
+                    <i class="bi bi-calendar-event"></i> 
+                    {{ event.event_date|date:"d.m.Y H:i" }} |
+                    <i class="bi bi-tag"></i> 
+                    {{ event.get_event_type_display }}
+                </p>
+                
+                <p class="card-text">{{ event.description }}</p>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-info me-2">
+                            <i class="bi bi-people"></i> {{ candidates.count }} kandydatów
+                        </span>
+                        <span class="badge bg-primary">
+                            <i class="bi bi-check-circle"></i> {{ total_votes }} głosów
+                        </span>
+                    </div>
+                    {% if has_voted %}
+                        <div class="alert alert-success mb-0 py-2">
+                            <i class="bi bi-check-circle"></i> Już oddałeś głos w tym sondażu
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Candidates -->
+        <div class="row">
+            {% for candidate in candidates %}
+                <div class="col-md-6 mb-4">
+                    <div class="card candidate-card h-100 shadow-sm">
+                        {% if candidate.main_photo %}
+                            <img src="{{ candidate.main_photo.url }}" class="card-img-top" alt="{{ candidate.name }}" style="height: 200px; object-fit: cover;">
+                        {% else %}
+                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                <i class="bi bi-person display-4 text-muted"></i>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title mb-0">{{ candidate.name }}</h5>
+                                {% if candidate.is_premium %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-star"></i> Premium
+                                    </span>
+                                {% endif %}
+                            </div>
+                            
+                            <p class="card-text text-muted small">
+                                <i class="bi bi-person-badge"></i> 
+                                {{ candidate.get_candidate_type_display }}
+                            </p>
+                            
+                            <p class="card-text">{{ candidate.description|truncatewords:15 }}</p>
+                            
+                            <!-- Results -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted">Wynik:</small>
+                                    <small class="text-muted">{{ candidate.vote_count }} głosów ({{ candidate.vote_percentage }}%)</small>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar" role="progressbar" 
+                                         style="width: {{ candidate.vote_percentage }}%;" 
+                                         aria-valuenow="{{ candidate.vote_percentage }}" 
+                                         aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'polls:candidate_detail' candidate.id %}" class="btn btn-outline-primary btn-sm flex-fill">
+                                    <i class="bi bi-eye"></i> Szczegóły
+                                </a>
+                                
+                                {% if not has_voted and event.is_active %}
+                                    <button class="btn btn-success btn-sm vote-button flex-fill" 
+                                            onclick="voteForCandidate('{{ candidate.id }}')"
+                                            data-candidate-id="{{ candidate.id }}">
+                                        <i class="bi bi-check-circle"></i> Głosuj
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Live Results -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-up"></i> Wyniki na żywo
+                </h5>
+            </div>
+            <div class="card-body" id="live-results">
+                {% for result in results %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong>{{ result.candidate.name }}</strong>
+                            <span class="badge bg-primary">{{ result.percentage }}%</span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: {{ result.percentage }}%;" 
+                                 aria-valuenow="{{ result.percentage }}" 
+                                 aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                        <small class="text-muted">{{ result.vote_count }} głosów</small>
+                    </div>
+                {% endfor %}
+                
+                <div class="text-center mt-3">
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i> Ostatnia aktualizacja: <span id="last-update">{{ event.updated_at|date:"H:i:s" }}</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Voting Info -->
+        {% if not has_voted and event.is_active %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle"></i> Informacje o głosowaniu
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="bi bi-check text-success"></i> 
+                            Możesz oddać tylko jeden głos
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-shield-check text-info"></i> 
+                            Głosowanie jest anonimowe
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-geo-alt text-warning"></i> 
+                            Głosy są zabezpieczone przed duplikacją
+                        </li>
+                        <li>
+                            <i class="bi bi-clock text-primary"></i> 
+                            Sondaż kończy się: {{ event.event_date|date:"d.m.Y H:i" }}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Vote Confirmation Modal -->
+<div class="modal fade" id="voteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Potwierdź głos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Czy na pewno chcesz oddać głos na <strong id="candidate-name"></strong>?</p>
+                <p class="text-muted small">Uwaga: Nie będziesz mógł zmienić swojego głosu!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                <button type="button" class="btn btn-success" id="confirm-vote">
+                    <i class="bi bi-check-circle"></i> Potwierdź głos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedCandidateId = null;
+let voteModal = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    voteModal = new bootstrap.Modal(document.getElementById('voteModal'));
+    
+    // Auto-refresh results every 30 seconds
+    if (document.querySelector('#live-results')) {
+        setInterval(refreshResults, 30000);
+    }
+});
+
+function voteForCandidate(candidateId) {
+    selectedCandidateId = candidateId;
+    const candidateName = document.querySelector(`[data-candidate-id="${candidateId}"]`).closest('.card').querySelector('.card-title').textContent;
+    document.getElementById('candidate-name').textContent = candidateName;
+    voteModal.show();
+}
+
+document.getElementById('confirm-vote').addEventListener('click', function() {
+    if (!selectedCandidateId) return;
+    
+    // Get browser fingerprint (simple implementation)
+    const fingerprint = generateFingerprint();
+    
+    fetch(`{% url 'polls:vote' event.id %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            candidate_id: selectedCandidateId,
+            fingerprint: fingerprint
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            showAlert('Głos został oddany pomyślnie!', 'success');
+            
+            // Refresh results
+            refreshResults();
+            
+            // Disable voting buttons
+            document.querySelectorAll('.vote-button').forEach(btn => {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bi bi-check-circle"></i> Głos oddany';
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-secondary');
+            });
+            
+            // Show voted message
+            const votedMessage = document.createElement('div');
+            votedMessage.className = 'alert alert-success mt-3';
+            votedMessage.innerHTML = '<i class="bi bi-check-circle"></i> Dziękujemy za oddanie głosu!';
+            document.querySelector('.card-body').appendChild(votedMessage);
+            
+        } else {
+            showAlert(data.message || 'Wystąpił błąd podczas głosowania.', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Wystąpił błąd podczas głosowania.', 'danger');
+    })
+    .finally(() => {
+        voteModal.hide();
+    });
+});
+
+function refreshResults() {
+    fetch(`{% url 'polls:get_results' event.id %}`)
+    .then(response => response.json())
+    .then(data => {
+        // Update results display
+        const resultsContainer = document.getElementById('live-results');
+        resultsContainer.innerHTML = '';
+        
+        data.results.forEach(result => {
+            const resultHtml = `
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong>${result.name}</strong>
+                        <span class="badge bg-primary">${result.percentage}%</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar" role="progressbar" 
+                             style="width: ${result.percentage}%;" 
+                             aria-valuenow="${result.percentage}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                    <small class="text-muted">${result.vote_count} głosów</small>
+                </div>
+            `;
+            resultsContainer.innerHTML += resultHtml;
+        });
+        
+        // Update last update time
+        document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+    })
+    .catch(error => {
+        console.error('Error refreshing results:', error);
+    });
+}
+
+function generateFingerprint() {
+    // Simple fingerprint generation
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillText('Fingerprint', 2, 2);
+    return canvas.toDataURL();
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

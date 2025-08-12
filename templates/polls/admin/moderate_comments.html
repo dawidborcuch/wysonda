@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Moderacja komentarzy - Wysonda{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">
+                <i class="bi bi-chat-dots text-primary"></i>
+                Moderacja komentarzy
+            </h1>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-list-check"></i> Komentarze oczekujące na moderację
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if pending_comments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Autor</th>
+                                    <th>Kandydat</th>
+                                    <th>Treść</th>
+                                    <th>Data</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for comment in pending_comments %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ comment.author_name }}</strong>
+                                            {% if comment.author_email %}
+                                                <br><small class="text-muted">{{ comment.author_email }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'polls:candidate_detail' comment.candidate.id %}">
+                                                {{ comment.candidate.name }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <div class="comment-content">
+                                                {{ comment.content|truncatewords:20 }}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ comment.created_at|date:"d.m.Y H:i" }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'polls:approve_comment' comment.id %}" 
+                                                   class="btn btn-success" title="Zatwierdź">
+                                                    <i class="bi bi-check"></i>
+                                                </a>
+                                                <a href="{% url 'polls:delete_comment' comment.id %}" 
+                                                   class="btn btn-danger" title="Usuń"
+                                                   onclick="return confirm('Czy na pewno chcesz usunąć ten komentarz?')">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-check-circle display-1 text-success"></i>
+                        <h5 class="mt-3">Brak komentarzy do moderacji</h5>
+                        <p class="text-muted">Wszystkie komentarze zostały już przetworzone.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Przycisk powrotu -->
+<div class="row mt-4">
+    <div class="col-12">
+        <a href="{% url 'polls:admin_dashboard' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Powrót do panelu
+        </a>
+    </div>
+</div>
+{% endblock %}

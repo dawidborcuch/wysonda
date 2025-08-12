@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Panel administratora - Wysonda{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">
+                <i class="bi bi-gear text-primary"></i>
+                Panel administratora
+            </h1>
+            <a href="{% url 'polls:admin_event_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Nowe wydarzenie
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statystyki -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ total_events }}</h4>
+                        <p class="card-text">Wszystkie wydarzenia</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-calendar-event display-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ active_events }}</h4>
+                        <p class="card-text">Aktywne wydarzenia</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-play-circle display-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ total_candidates }}</h4>
+                        <p class="card-text">Kandydaci</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-people display-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ total_votes }}</h4>
+                        <p class="card-text">Wszystkie głosy</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-check-circle display-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Ostatnie wydarzenia -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clock"></i> Ostatnie wydarzenia
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_events %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nazwa</th>
+                                    <th>Typ</th>
+                                    <th>Data</th>
+                                    <th>Status</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in recent_events %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ event.title }}</strong>
+                                            {% if event.description %}
+                                                <br><small class="text-muted">{{ event.description|truncatewords:10 }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ event.get_event_type_display }}</span>
+                                        </td>
+                                        <td>{{ event.event_date|date:"d.m.Y" }}</td>
+                                        <td>
+                                            {% if event.event_date > now %}
+                                                {% if event.status == 'active' %}
+                                                    <span class="badge bg-success">Aktywne</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">Nadchodzące</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-secondary">Zakończone</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'polls:admin_event_detail' event.id %}" class="btn btn-outline-primary" title="Zobacz szczegóły">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{% url 'polls:admin_event_edit' event.id %}" class="btn btn-outline-warning" title="Edytuj">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <a href="{% url 'polls:admin_candidate_create' event.id %}" class="btn btn-outline-success" title="Dodaj kandydata">
+                                                    <i class="bi bi-person-plus"></i>
+                                                </a>
+                                                <button type="button" class="btn btn-outline-danger" title="Usuń" 
+                                                        data-bs-toggle="modal" data-bs-target="#deleteEventModal{{ event.id }}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-calendar-x display-1 text-muted"></i>
+                        <h5 class="mt-3">Brak wydarzeń</h5>
+                        <p class="text-muted">Nie ma jeszcze żadnych wydarzeń do wyświetlenia.</p>
+                        <a href="{% url 'polls:admin_event_create' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Utwórz pierwsze wydarzenie
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Ostatnie głosy -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-check-circle"></i> Ostatnie głosy
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_votes %}
+                    <div class="list-group list-group-flush">
+                        {% for vote in recent_votes %}
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>{{ vote.candidate.name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ vote.event.title }}</small>
+                                    </div>
+                                    <small class="text-muted">{{ vote.created_at|date:"H:i" }}</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-check-circle display-4 text-muted"></i>
+                        <p class="text-muted mt-2">Brak głosów</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Szybkie akcje -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning"></i> Szybkie akcje
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'polls:admin_event_create' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Nowe wydarzenie
+                    </a>
+                    <a href="{% url 'polls:moderate_comments' %}" class="btn btn-outline-warning">
+                        <i class="bi bi-chat-dots"></i> Moderuj komentarze
+                    </a>
+                    <a href="{% url 'admin:index' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-gear"></i> Django Admin
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modale potwierdzenia usuwania wydarzeń -->
+{% for event in recent_events %}
+<div class="modal fade" id="deleteEventModal{{ event.id }}" tabindex="-1" aria-labelledby="deleteEventModalLabel{{ event.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteEventModalLabel{{ event.id }}">
+                    <i class="bi bi-exclamation-triangle text-danger"></i>
+                    Potwierdź usunięcie
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Czy na pewno chcesz usunąć wydarzenie <strong>"{{ event.title }}"</strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Uwaga!</strong> Ta operacja jest nieodwracalna. Zostaną również usunięte:
+                    <ul class="mb-0 mt-2">
+                        <li>Wszyscy kandydaci ({{ event.candidates.count }})</li>
+                        <li>Wszystkie głosy ({{ event.votes.count }})</li>
+                        <li>Wszystkie komentarze</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Anuluj
+                </button>
+                <form method="post" action="{% url 'polls:delete_event' event.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Usuń wydarzenie
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
