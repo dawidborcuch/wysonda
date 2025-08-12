@@ -117,12 +117,18 @@
                                     <i class="bi bi-eye"></i> Szczegóły
                                 </a>
                                 
-                                {% if not has_voted and event.is_active %}
-                                    <button class="btn btn-success btn-sm vote-button flex-fill" 
-                                            onclick="voteForCandidate('{{ candidate.id }}')"
-                                            data-candidate-id="{{ candidate.id }}">
-                                        <i class="bi bi-check-circle"></i> Głosuj
-                                    </button>
+                                {% if event.is_active %}
+                                    {% if not has_voted %}
+                                        <button class="btn btn-success btn-sm vote-button flex-fill" 
+                                                onclick="voteForCandidate('{{ candidate.id }}')"
+                                                data-candidate-id="{{ candidate.id }}">
+                                            <i class="bi bi-check-circle"></i> Głosuj
+                                        </button>
+                                    {% elif user_vote.candidate.id == candidate.id %}
+                                        <button class="btn btn-warning btn-sm vote-button flex-fill" disabled>
+                                            <i class="bi bi-check-circle"></i> Twój głos
+                                        </button>
+                                    {% endif %}
                                 {% endif %}
                             </div>
                         </div>
@@ -199,6 +205,16 @@
     </div>
 </div>
 
+<!-- Reset Vote Button (Fixed Position) -->
+{% if has_voted and event.is_active %}
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+    <button class="btn btn-danger btn-lg shadow" onclick="resetVote()" title="Resetuj swój głos">
+        <i class="bi bi-arrow-clockwise"></i>
+        <span class="d-none d-md-inline">Resetuj głos</span>
+    </button>
+</div>
+{% endif %}
+
 <!-- Vote Confirmation Modal -->
 <div class="modal fade" id="voteModal" tabindex="-1">
     <div class="modal-dialog">
@@ -243,13 +259,17 @@ function voteForCandidate(candidateId) {
     voteModal.show();
 }
 
+
+
 document.getElementById('confirm-vote').addEventListener('click', function() {
     if (!selectedCandidateId) return;
     
     // Get browser fingerprint (simple implementation)
     const fingerprint = generateFingerprint();
     
-    fetch(`{% url 'polls:vote' event.id %}`, {
+    const url = `{% url 'polls:vote' event.id %}`;
+    
+    fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -264,12 +284,14 @@ document.getElementById('confirm-vote').addEventListener('click', function() {
     .then(data => {
         if (data.success) {
             // Show success message
-            showAlert('Głos został oddany pomyślnie!', 'success');
+            showAlert(data.message, 'success');
             
-            // Refresh results
-            refreshResults();
+            // Wait a moment for the server to process, then refresh results
+            setTimeout(() => {
+                refreshResults();
+            }, 500);
             
-            // Disable voting buttons
+            // Disable voting buttons for new vote
             document.querySelectorAll('.vote-button').forEach(btn => {
                 btn.disabled = true;
                 btn.innerHTML = '<i class="bi bi-check-circle"></i> Głos oddany';
@@ -282,6 +304,9 @@ document.getElementById('confirm-vote').addEventListener('click', function() {
             votedMessage.className = 'alert alert-success mt-3';
             votedMessage.innerHTML = '<i class="bi bi-check-circle"></i> Dziękujemy za oddanie głosu!';
             document.querySelector('.card-body').appendChild(votedMessage);
+            
+            // Show reset button
+            showResetButton();
             
         } else {
             showAlert(data.message || 'Wystąpił błąd podczas głosowania.', 'danger');
@@ -296,36 +321,126 @@ document.getElementById('confirm-vote').addEventListener('click', function() {
     });
 });
 
+
+
+function showResetButton() {
+    // Sprawdź czy przycisk reset już istnieje
+    let resetButton = document.querySelector('.position-fixed');
+    if (!resetButton) {
+        // Utwórz nowy przycisk reset
+        resetButton = document.createElement('div');
+        resetButton.className = 'position-fixed bottom-0 end-0 p-3';
+        resetButton.style.zIndex = '1050';
+        resetButton.innerHTML = `
+            <button class="btn btn-danger btn-lg shadow" onclick="resetVote()" title="Resetuj swój głos">
+                <i class="bi bi-arrow-clockwise"></i>
+                <span class="d-none d-md-inline">Resetuj głos</span>
+            </button>
+        `;
+        document.body.appendChild(resetButton);
+    } else {
+        // Pokaż istniejący przycisk
+        resetButton.style.display = 'block';
+    }
+}
+
+function resetVote() {
+    if (confirm('Czy na pewno chcesz zresetować swój głos? Będziesz mógł oddać głos ponownie.')) {
+        fetch(`{% url 'polls:reset_vote' event.id %}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Głos został zresetowany. Możesz oddać głos ponownie.', 'success');
+                
+                // Refresh results
+                refreshResults();
+                
+                // Przeładuj stronę po resecie głosu
+                window.location.reload();
+                
+            } else {
+                showAlert(data.message || 'Wystąpił błąd podczas resetowania głosu.', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Wystąpił błąd podczas resetowania głosu.', 'danger');
+        });
+    }
+}
+
 function refreshResults() {
     fetch(`{% url 'polls:get_results' event.id %}`)
     .then(response => response.json())
     .then(data => {
-        // Update results display
+        // Update live results sidebar
         const resultsContainer = document.getElementById('live-results');
-        resultsContainer.innerHTML = '';
-        
-        data.results.forEach(result => {
-            const resultHtml = `
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <strong>${result.name}</strong>
-                        <span class="badge bg-primary">${result.percentage}%</span>
-                    </div>
-                    <div class="progress" style="height: 10px;">
-                        <div class="progress-bar" role="progressbar" 
-                             style="width: ${result.percentage}%;" 
-                             aria-valuenow="${result.percentage}" 
-                             aria-valuemin="0" aria-valuemax="100">
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+            
+            data.results.forEach(result => {
+                const resultHtml = `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong>${result.name}</strong>
+                            <span class="badge bg-primary">${result.percentage}%</span>
                         </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: ${result.percentage}%;" 
+                                 aria-valuenow="${result.percentage}" 
+                                 aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                        <small class="text-muted">${result.vote_count} głosów</small>
                     </div>
-                    <small class="text-muted">${result.vote_count} głosów</small>
-                </div>
-            `;
-            resultsContainer.innerHTML += resultHtml;
+                `;
+                resultsContainer.innerHTML += resultHtml;
+            });
+        }
+        
+        // Update candidate cards results
+        data.results.forEach(result => {
+            const candidateCard = document.querySelector(`[data-candidate-id="${result.id}"]`);
+            if (candidateCard) {
+                const card = candidateCard.closest('.card');
+                if (card) {
+                    // Update vote count and percentage text
+                    const voteCountElements = card.querySelectorAll('.text-muted');
+                    for (let element of voteCountElements) {
+                        if (element.textContent.includes('głosów') && element.textContent.includes('(')) {
+                            element.textContent = `${result.vote_count} głosów (${result.percentage}%)`;
+                            break;
+                        }
+                    }
+                    
+                    // Update progress bar
+                    const progressBar = card.querySelector('.progress-bar');
+                    if (progressBar) {
+                        progressBar.style.width = `${result.percentage}%`;
+                        progressBar.setAttribute('aria-valuenow', result.percentage);
+                    }
+                }
+            }
         });
         
+        // Update total votes in header
+        const totalVotesElement = document.querySelector('.badge.bg-primary');
+        if (totalVotesElement && totalVotesElement.textContent.includes('głosów')) {
+            totalVotesElement.innerHTML = `<i class="bi bi-check-circle"></i> ${data.total_votes} głosów`;
+        }
+        
         // Update last update time
-        document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        const lastUpdateElement = document.getElementById('last-update');
+        if (lastUpdateElement) {
+            lastUpdateElement.textContent = new Date().toLocaleTimeString();
+        }
     })
     .catch(error => {
         console.error('Error refreshing results:', error);

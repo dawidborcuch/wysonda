@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ candidate.name }} - Wysonda{% endblock %}
+
+{% block extra_css %}
+<style>
+    .candidate-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+    }
+    .candidate-photo {
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .comment-card {
+        transition: transform 0.2s;
+    }
+    .comment-card:hover {
+        transform: translateY(-2px);
+    }
+    .premium-content {
+        background: linear-gradient(45deg, #ffd700, #ffed4e);
+        border: 2px solid #ffc107;
+        border-radius: 10px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Candidate Header -->
+<div class="candidate-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-4 text-center">
+                {% if candidate.main_photo %}
+                    <img src="{{ candidate.main_photo.url }}" alt="{{ candidate.name }}" 
+                         class="candidate-photo img-fluid" style="max-height: 300px; object-fit: cover;">
+                {% else %}
+                    <div class="candidate-photo bg-light d-flex align-items-center justify-content-center" 
+                         style="height: 300px; width: 100%;">
+                        <i class="bi bi-person display-1 text-muted"></i>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="col-md-8">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h1 class="mb-0">{{ candidate.name }}</h1>
+                    {% if candidate.is_premium %}
+                        <span class="badge bg-warning fs-6">
+                            <i class="bi bi-star"></i> Premium
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <p class="text-light mb-3">
+                    <i class="bi bi-person-badge"></i> 
+                    {{ candidate.get_candidate_type_display }}
+                </p>
+                
+                <p class="lead mb-3">{{ candidate.description }}</p>
+                
+                <div class="d-flex gap-3">
+                    <span class="badge bg-light text-dark fs-6">
+                        <i class="bi bi-check-circle"></i> {{ candidate.vote_count }} głosów
+                    </span>
+                    <span class="badge bg-light text-dark fs-6">
+                        <i class="bi bi-percent"></i> {{ candidate.vote_percentage }}% poparcia
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Main Content -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="bi bi-info-circle"></i> O kandydacie
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ candidate.description }}</p>
+                    
+                    {% if candidate.is_premium and candidate.extended_description %}
+                        <div class="premium-content">
+                            <h5><i class="bi bi-star"></i> Treść premium</h5>
+                            <p>{{ candidate.extended_description }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Comments Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="bi bi-chat-dots"></i> Komentarze ({{ comments.count }})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <!-- Add Comment Form -->
+                    <form method="post" class="mb-4">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send"></i> Dodaj komentarz
+                        </button>
+                    </form>
+
+                    <!-- Comments List -->
+                    {% if comments %}
+                        {% for comment in comments %}
+                            <div class="card comment-card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <strong>{{ comment.author_name }}</strong>
+                                            <small class="text-muted ms-2">
+                                                <i class="bi bi-clock"></i> {{ comment.created_at|date:"d.m.Y H:i" }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <p class="card-text mb-0">{{ comment.content }}</p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-chat-dots display-4"></i>
+                            <p class="mt-3">Brak komentarzy. Bądź pierwszy!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Candidate Stats -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-graph-up"></i> Statystyki
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span>Poparcie:</span>
+                            <span class="badge bg-primary">{{ candidate.vote_percentage }}%</span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: {{ candidate.vote_percentage }}%;" 
+                                 aria-valuenow="{{ candidate.vote_percentage }}" 
+                                 aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h4 class="text-primary mb-0">{{ candidate.vote_count }}</h4>
+                                <small class="text-muted">Głosów</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-success mb-0">{{ comments.count }}</h4>
+                            <small class="text-muted">Komentarzy</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Event Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar-event"></i> Wydarzenie
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>{{ candidate.event.title }}</h6>
+                    <p class="text-muted mb-2">
+                        <i class="bi bi-calendar"></i> {{ candidate.event.event_date|date:"d.m.Y H:i" }}
+                    </p>
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-tag"></i> {{ candidate.event.get_event_type_display }}
+                    </p>
+                    
+                    <a href="{% url 'polls:event_detail' candidate.event.id %}" class="btn btn-outline-primary btn-sm mt-3">
+                        <i class="bi bi-arrow-left"></i> Powrót do sondażu
+                    </a>
+                </div>
+            </div>
+
+            <!-- Premium Features -->
+            {% if candidate.is_premium %}
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="bi bi-star"></i> Funkcje premium
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-2">
+                                <i class="bi bi-check text-success"></i> Rozszerzony opis
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check text-success"></i> Dodatkowe zdjęcia
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check text-success"></i> Artykuły i materiały
+                            </li>
+                            <li>
+                                <i class="bi bi-check text-success"></i> Priorytetowe wyświetlanie
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

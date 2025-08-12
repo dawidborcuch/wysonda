@@ -62,7 +62,8 @@ def event_detail(request, event_id):
     
     # Sprawdź czy użytkownik już głosował
     client_ip = get_client_ip(request)
-    has_voted = Vote.objects.filter(event=event, ip_address=client_ip).exists()
+    user_vote = Vote.objects.filter(event=event, ip_address=client_ip).first()
+    has_voted = user_vote is not None
     
     # Pobierz wyniki
     results = []
@@ -86,6 +87,7 @@ def event_detail(request, event_id):
         'results': results,
         'total_votes': total_votes,
         'has_voted': has_voted,
+        'user_vote': user_vote,
         'client_ip': client_ip,
         'now': timezone.now(),
     }
@@ -132,6 +134,112 @@ def vote(request, event_id):
             'success': True,
             'message': 'Głos został oddany pomyślnie!',
             'vote_id': str(vote.id)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Wystąpił błąd: {str(e)}'
+        }, status=500)
+
+
+@require_POST
+@csrf_exempt
+def change_vote(request, event_id):
+    """Zmiana głosu w sondażu"""
+    try:
+        data = json.loads(request.body)
+        candidate_id = data.get('candidate_id')
+        browser_fingerprint = data.get('fingerprint', '')
+        
+        event = get_object_or_404(Event, id=event_id)
+        candidate = get_object_or_404(Candidate, id=candidate_id, event=event)
+        
+        client_ip = get_client_ip(request)
+        
+        # Sprawdź czy użytkownik już głosował
+        existing_vote = Vote.objects.filter(event=event, ip_address=client_ip).first()
+        if not existing_vote:
+            return JsonResponse({
+                'success': False,
+                'message': 'Nie oddałeś jeszcze głosu w tym sondażu.'
+            }, status=400)
+        
+        # Sprawdź czy sondaż jest aktywny
+        if not event.is_active:
+            return JsonResponse({
+                'success': False,
+                'message': 'Sondaż nie jest już aktywny.'
+            }, status=400)
+        
+        # Usuń poprzedni głos i dodaj nowy
+        old_candidate = existing_vote.candidate
+        existing_vote.delete()
+        
+        new_vote = Vote.objects.create(
+            event=event,
+            candidate=candidate,
+            ip_address=client_ip,
+            browser_fingerprint=browser_fingerprint,
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+        )
+        
+        # Aktualizuj analitykę
+        analytics, created = PollAnalytics.objects.get_or_create(event=event)
+        analytics.total_votes = event.votes.count()
+        analytics.unique_voters = event.votes.values('ip_address').distinct().count()
+        analytics.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Głos został zmieniony z {old_candidate.name} na {candidate.name}!',
+            'vote_id': str(new_vote.id),
+            'old_candidate': old_candidate.name,
+            'new_candidate': candidate.name
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Wystąpił błąd: {str(e)}'
+        }, status=500)
+
+
+@require_POST
+@csrf_exempt
+def reset_vote(request, event_id):
+    """Resetowanie głosu użytkownika"""
+    try:
+        event = get_object_or_404(Event, id=event_id)
+        client_ip = get_client_ip(request)
+        
+        # Sprawdź czy użytkownik już głosował
+        existing_vote = Vote.objects.filter(event=event, ip_address=client_ip).first()
+        if not existing_vote:
+            return JsonResponse({
+                'success': False,
+                'message': 'Nie oddałeś jeszcze głosu w tym sondażu.'
+            }, status=400)
+        
+        # Sprawdź czy sondaż jest aktywny
+        if not event.is_active:
+            return JsonResponse({
+                'success': False,
+                'message': 'Sondaż nie jest już aktywny.'
+            }, status=400)
+        
+        # Usuń głos
+        existing_vote.delete()
+        
+        # Aktualizuj analitykę
+        analytics, created = PollAnalytics.objects.get_or_create(event=event)
+        analytics.total_votes = event.votes.count()
+        analytics.unique_voters = event.votes.values('ip_address').distinct().count()
+        analytics.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Głos został zresetowany. Możesz oddać głos ponownie.'
         })
         
     except Exception as e:
