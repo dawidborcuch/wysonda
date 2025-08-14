@@ -22,8 +22,7 @@ urlpatterns = [
     path('dashboard/event/<uuid:event_id>/candidate/create/', views.admin_candidate_create, name='admin_candidate_create'),
     path('dashboard/candidate/<uuid:candidate_id>/edit/', views.admin_candidate_edit, name='admin_candidate_edit'),
     path('dashboard/event/<uuid:event_id>/export/', views.export_results, name='export_results'),
-    path('dashboard/comments/', views.moderate_comments, name='moderate_comments'),
-    path('dashboard/comments/<uuid:comment_id>/approve/', views.approve_comment, name='approve_comment'),
+
     path('dashboard/comments/<uuid:comment_id>/delete/', views.delete_comment, name='delete_comment'),
     path('dashboard/event/<uuid:event_id>/delete/', views.delete_event, name='delete_event'),
 ]

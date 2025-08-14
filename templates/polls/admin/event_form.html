@@ -4,10 +4,45 @@
 
 {% block title %}{{ title }} - Wysonda{% endblock %}
 
+{% block extra_css %}
+<style>
+    .candidate-row {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border: 1px solid #dee2e6;
+    }
+    .candidate-row:hover {
+        background-color: #e9ecef;
+    }
+    .candidate-photo {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 2px solid #dee2e6;
+    }
+    .candidate-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    .add-candidate-section {
+        background-color: #d1ecf1;
+        border: 1px solid #bee5eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card">
+    <div class="col-lg-10">
+        <!-- Event Form -->
+        <div class="card mb-4">
             <div class="card-header">
                 <h4 class="card-title mb-0">
                     <i class="bi bi-calendar-plus text-primary"></i>
@@ -24,12 +59,81 @@
                             <i class="bi bi-arrow-left"></i> Powrót
                         </a>
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Zapisz
+                            <i class="bi bi-check-circle"></i> Zapisz wydarzenie
                         </button>
                     </div>
                 </form>
             </div>
         </div>
+
+        <!-- Candidates Section (only for existing events) -->
+        {% if event %}
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="card-title mb-0">
+                    <i class="bi bi-people text-success"></i>
+                    Kandydaci ({{ event.candidates.count }})
+                </h4>
+                <a href="{% url 'polls:admin_candidate_create' event.id %}" class="btn btn-success btn-sm">
+                    <i class="bi bi-plus-circle"></i> Dodaj kandydata
+                </a>
+            </div>
+            <div class="card-body">
+                {% if event.candidates.all %}
+                    {% for candidate in event.candidates.all %}
+                    <div class="candidate-row">
+                        <div class="row align-items-center">
+                            <div class="col-md-2 text-center">
+                                {% if candidate.main_photo %}
+                                    <img src="{{ candidate.main_photo.url }}" alt="{{ candidate.name }}" class="candidate-photo">
+                                {% else %}
+                                    <div class="candidate-photo bg-light d-flex align-items-center justify-content-center">
+                                        <i class="bi bi-person text-muted"></i>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="mb-1">{{ candidate.name }}</h6>
+                                <small class="text-muted">{{ candidate.get_candidate_type_display }}</small>
+                                {% if candidate.is_premium %}
+                                    <span class="badge bg-warning ms-2">
+                                        <i class="bi bi-star"></i> Premium
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">
+                                    <i class="bi bi-check-circle"></i> {{ candidate.vote_count }} głosów
+                                    {% if candidate.vote_percentage > 0 %}
+                                        ({{ candidate.vote_percentage }}%)
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="candidate-actions">
+                                    <a href="{% url 'polls:admin_candidate_edit' candidate.id %}" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-pencil"></i> Edytuj
+                                    </a>
+                                    <a href="{% url 'polls:candidate_detail' candidate.id %}" class="btn btn-outline-info btn-sm" target="_blank">
+                                        <i class="bi bi-eye"></i> Podgląd
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-people display-4"></i>
+                        <p class="mt-3">Brak kandydatów w tym wydarzeniu.</p>
+                        <a href="{% url 'polls:admin_candidate_create' event.id %}" class="btn btn-success">
+                            <i class="bi bi-plus-circle"></i> Dodaj pierwszego kandydata
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

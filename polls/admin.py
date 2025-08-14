@@ -5,6 +5,12 @@ from django.utils.safestring import mark_safe
 from .models import Event, Candidate, Vote, Comment, UserBadge, PollAnalytics
 
 
+class CandidateInline(admin.TabularInline):
+    model = Candidate
+    extra = 1
+    fields = ['name', 'description', 'candidate_type', 'is_premium', 'main_photo']
+    readonly_fields = ['vote_count', 'vote_percentage']
+
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     list_display = ['title', 'event_type', 'event_date', 'status', 'is_private', 'candidate_count', 'vote_count', 'created_at']
@@ -13,6 +19,7 @@ class EventAdmin(admin.ModelAdmin):
     date_hierarchy = 'event_date'
     readonly_fields = ['id', 'created_at', 'updated_at']
     list_editable = ['status']
+    inlines = [CandidateInline]
     
     fieldsets = (
         ('Podstawowe informacje', {
@@ -131,20 +138,20 @@ class VoteAdmin(admin.ModelAdmin):
 class CommentAdmin(admin.ModelAdmin):
     list_display = ['author_name', 'candidate_name', 'is_approved', 'created_at', 'content_preview']
     list_filter = ['is_approved', 'created_at', 'candidate__candidate_type']
-    search_fields = ['author_name', 'author_email', 'content', 'candidate__name']
-    readonly_fields = ['id', 'created_at', 'ip_address']
+    search_fields = ['author_email', 'content', 'candidate__name']
+    readonly_fields = ['id', 'created_at', 'ip_address', 'author_name']
     list_editable = ['is_approved']
     actions = ['approve_comments', 'reject_comments']
     
     fieldsets = (
         ('Komentarz', {
-            'fields': ('candidate', 'author_name', 'author_email', 'content')
+            'fields': ('candidate', 'author_email', 'content')
         }),
         ('Moderacja', {
             'fields': ('is_approved',)
         }),
         ('Systemowe', {
-            'fields': ('id', 'ip_address', 'created_at'),
+            'fields': ('id', 'ip_address', 'created_at', 'author_name'),
             'classes': ('collapse',)
         }),
     )

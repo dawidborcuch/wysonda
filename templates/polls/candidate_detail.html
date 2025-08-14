@@ -22,13 +22,14 @@
     .comment-card:hover {
         transform: translateY(-2px);
     }
-    .premium-content {
-        background: linear-gradient(45deg, #ffd700, #ffed4e);
-        border: 2px solid #ffc107;
-        border-radius: 10px;
-        padding: 1rem;
-        margin: 1rem 0;
+    .comment-card:hover .comment-actions {
+        opacity: 1 !important;
     }
+    .comment-actions {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
 </style>
 {% endblock %}
 
@@ -51,11 +52,7 @@
             <div class="col-md-8">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <h1 class="mb-0">{{ candidate.name }}</h1>
-                    {% if candidate.is_premium %}
-                        <span class="badge bg-warning fs-6">
-                            <i class="bi bi-star"></i> Premium
-                        </span>
-                    {% endif %}
+
                 </div>
                 
                 <p class="text-light mb-3">
@@ -85,15 +82,20 @@
             <div class="card mb-4">
                 <div class="card-header">
                     <h3 class="mb-0">
-                        <i class="bi bi-info-circle"></i> O kandydacie
+                        <i class="bi bi-info-circle"></i> 
+                        {% if candidate.candidate_type == 'individual' %}
+                            O kandydacie
+                        {% else %}
+                            O partii
+                        {% endif %}
                     </h3>
                 </div>
                 <div class="card-body">
                     <p class="card-text">{{ candidate.description }}</p>
                     
-                    {% if candidate.is_premium and candidate.extended_description %}
-                        <div class="premium-content">
-                            <h5><i class="bi bi-star"></i> Treść premium</h5>
+                    {% if candidate.extended_description %}
+                        <div class="mt-3">
+                            <h5>Szczegółowy opis</h5>
                             <p>{{ candidate.extended_description }}</p>
                         </div>
                     {% endif %}
@@ -109,6 +111,18 @@
                 </div>
                 <div class="card-body">
                     <!-- Add Comment Form -->
+                    {% if user.is_authenticated %}
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-person-check"></i>
+                            <strong>Zalogowany jako:</strong> {{ user.username }} - Twoje komentarze będą wyświetlane pod tą nazwą użytkownika.
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-shield-check"></i>
+                            <strong>Anonimowość:</strong> Twoje komentarze będą wyświetlane pod automatycznie wygenerowaną nazwą użytkownika. 
+                            <a href="{% url 'accounts:signup' %}" class="alert-link">Zarejestruj się</a> aby używać własnej nazwy użytkownika.
+                        </div>
+                    {% endif %}
                     <form method="post" class="mb-4">
                         {% csrf_token %}
                         {{ form|crispy }}
@@ -120,15 +134,24 @@
                     <!-- Comments List -->
                     {% if comments %}
                         {% for comment in comments %}
-                            <div class="card comment-card mb-3">
+                            <div class="card comment-card mb-3" data-comment-id="{{ comment.id }}">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div>
-                                            <strong>{{ comment.author_name }}</strong>
-                                            <small class="text-muted ms-2">
-                                                <i class="bi bi-clock"></i> {{ comment.created_at|date:"d.m.Y H:i" }}
-                                            </small>
+                                                                                      <div>
+                                                  <strong>{{ comment.author_name }}</strong>
+                                                  <small class="text-muted ms-2">
+                                                      <i class="bi bi-clock"></i> {{ comment.created_at|date:"d.m.Y H:i" }}
+                                                  </small>
+                                              </div>
+                                        {% if user.is_staff %}
+                                        <div class="comment-actions" style="opacity: 0; transition: opacity 0.2s;">
+                                            <button class="btn btn-outline-danger btn-sm" 
+                                                    onclick="deleteComment('{{ comment.id }}')" 
+                                                    title="Usuń komentarz">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
                                         </div>
+                                        {% endif %}
                                     </div>
                                     <p class="card-text mb-0">{{ comment.content }}</p>
                                 </div>
@@ -145,42 +168,7 @@
         </div>
 
         <div class="col-lg-4">
-            <!-- Candidate Stats -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-graph-up"></i> Statystyki
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span>Poparcie:</span>
-                            <span class="badge bg-primary">{{ candidate.vote_percentage }}%</span>
-                        </div>
-                        <div class="progress" style="height: 10px;">
-                            <div class="progress-bar" role="progressbar" 
-                                 style="width: {{ candidate.vote_percentage }}%;" 
-                                 aria-valuenow="{{ candidate.vote_percentage }}" 
-                                 aria-valuemin="0" aria-valuemax="100">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row text-center">
-                        <div class="col-6">
-                            <div class="border-end">
-                                <h4 class="text-primary mb-0">{{ candidate.vote_count }}</h4>
-                                <small class="text-muted">Głosów</small>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <h4 class="text-success mb-0">{{ comments.count }}</h4>
-                            <small class="text-muted">Komentarzy</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             <!-- Event Info -->
             <div class="card mb-4">
@@ -204,33 +192,91 @@
                 </div>
             </div>
 
-            <!-- Premium Features -->
-            {% if candidate.is_premium %}
-                <div class="card">
-                    <div class="card-header bg-warning text-dark">
-                        <h5 class="mb-0">
-                            <i class="bi bi-star"></i> Funkcje premium
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-unstyled mb-0">
-                            <li class="mb-2">
-                                <i class="bi bi-check text-success"></i> Rozszerzony opis
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-check text-success"></i> Dodatkowe zdjęcia
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-check text-success"></i> Artykuły i materiały
-                            </li>
-                            <li>
-                                <i class="bi bi-check text-success"></i> Priorytetowe wyświetlanie
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            {% endif %}
+
         </div>
     </div>
 </div>
+
+{% if user.is_staff %}
+<script>
+function deleteComment(commentId) {
+    if (confirm('Czy na pewno chcesz usunąć ten komentarz? Ta operacja jest nieodwracalna.')) {
+        fetch(`/dashboard/comments/${commentId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Usuń komentarz z DOM
+                const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+                if (commentElement) {
+                    commentElement.remove();
+                    // Zaktualizuj licznik komentarzy
+                    const commentCount = document.querySelector('.card-header h3');
+                    const currentCount = parseInt(commentCount.textContent.match(/\((\d+)\)/)[1]);
+                    commentCount.innerHTML = `<i class="bi bi-chat-dots"></i> Komentarze (${currentCount - 1})`;
+                    
+                    // Zaktualizuj statystyki
+                    const statsCount = document.querySelector('.col-6:last-child h4');
+                    statsCount.textContent = currentCount - 1;
+                }
+                alert('Komentarz został usunięty.');
+            } else {
+                alert('Błąd podczas usuwania komentarza: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Wystąpił błąd podczas usuwania komentarza.');
+        });
+    }
+}
+</script>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Funkcja do usuwania błędów walidacji
+    function clearFieldErrors(field) {
+        // Usuń klasę is-invalid
+        field.classList.remove('is-invalid');
+        
+        // Znajdź i usuń komunikat błędu
+        const errorElement = field.parentNode.querySelector('.invalid-feedback');
+        if (errorElement) {
+            errorElement.remove();
+        }
+        
+        // Znajdź i usuń komunikat błędu w crispy forms
+        const crispyError = field.parentNode.querySelector('.help-block');
+        if (crispyError && crispyError.classList.contains('text-danger')) {
+            crispyError.remove();
+        }
+    }
+    
+    // Nasłuchuj zmian w polach formularza komentarzy
+    const form = document.querySelector('form');
+    if (form) {
+        const fields = form.querySelectorAll('input, textarea, select');
+        
+        fields.forEach(field => {
+            field.addEventListener('input', function() {
+                clearFieldErrors(this);
+            });
+            
+            field.addEventListener('change', function() {
+                clearFieldErrors(this);
+            });
+            
+            field.addEventListener('blur', function() {
+                clearFieldErrors(this);
+            });
+        });
+    }
+});
+</script>
 {% endblock %}

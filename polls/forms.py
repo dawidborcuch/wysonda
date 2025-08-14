@@ -60,12 +60,22 @@ class CommentForm(forms.ModelForm):
     """Formularz dla komentarza"""
     class Meta:
         model = Comment
-        fields = ['author_name', 'author_email', 'content']
+        fields = ['author_email', 'content']
         widgets = {
-            'author_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Twoje imię'}),
-            'author_email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Twój email'}),
+            'author_email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Twój email (opcjonalnie)'}),
             'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Napisz swój komentarz...'}),
         }
+    
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Jeśli użytkownik jest zalogowany, ukryj pole email
+        if self.user and self.user.is_authenticated:
+            self.fields['author_email'].widget = forms.HiddenInput()
+            self.fields['author_email'].required = False
+        else:
+            self.fields['author_email'].required = False
     
     def clean_content(self):
         """Walidacja treści komentarza"""

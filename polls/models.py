@@ -141,8 +141,8 @@ class Comment(models.Model):
     """Model reprezentujący komentarz pod profilem kandydata"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     candidate = models.ForeignKey(Candidate, on_delete=models.CASCADE, related_name='comments', verbose_name="Kandydat")
-    author_name = models.CharField(max_length=100, verbose_name="Nazwa autora")
-    author_email = models.EmailField(verbose_name="Email autora")
+    author = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='comments', verbose_name="Autor", null=True, blank=True)
+    author_email = models.EmailField(verbose_name="Email autora", blank=True, null=True)
     content = models.TextField(verbose_name="Treść komentarza")
     is_approved = models.BooleanField(default=False, verbose_name="Zatwierdzony")
     ip_address = models.GenericIPAddressField(verbose_name="Adres IP")
@@ -155,6 +155,44 @@ class Comment(models.Model):
     
     def __str__(self):
         return f"Komentarz od {self.author_name} na {self.candidate.name}"
+    
+    @property
+    def author_name(self):
+        """Zwraca nazwę autora - nickname użytkownika lub anonimową nazwę"""
+        if self.author and hasattr(self.author, 'profile'):
+            return self.author.profile.nickname
+        else:
+            return self.anonymous_author_name
+    
+    @property
+    def anonymous_author_name(self):
+        """Generuje anonimową nazwę autora na podstawie IP i email (dla niezalogowanych)"""
+        import hashlib
+        
+        # Utwórz unikalny identyfikator na podstawie IP i email (lub tylko IP jeśli email jest None)
+        email_part = self.author_email or "anonymous"
+        unique_string = f"{self.ip_address}_{email_part}"
+        hash_object = hashlib.md5(unique_string.encode())
+        hash_hex = hash_object.hexdigest()
+        
+        # Weź pierwsze 6 znaków hasha
+        short_hash = hash_hex[:6]
+        
+        # Lista przymiotników i rzeczowników dla generowania nazw
+        adjectives = ['Mądry', 'Szybki', 'Cichy', 'Wesoły', 'Spokojny', 'Aktywny', 'Kreatywny', 'Dzielny', 'Uczciwy', 'Przyjazny']
+        nouns = ['Obywatel', 'Głosujący', 'Komentator', 'Użytkownik', 'Mieszkaniec', 'Polak', 'Wyborca', 'Krytyk', 'Fan', 'Sympatyk']
+        
+        # Użyj hasha do wyboru przymiotnika i rzeczownika
+        adj_index = int(short_hash[:2], 16) % len(adjectives)
+        noun_index = int(short_hash[2:4], 16) % len(nouns)
+        
+        adjective = adjectives[adj_index]
+        noun = nouns[noun_index]
+        
+        # Dodaj numer na końcu dla unikalności
+        number = int(short_hash[4:6], 16) % 999 + 1
+        
+        return f"{adjective}{noun}{number}"
 
 
 class UserBadge(models.Model):

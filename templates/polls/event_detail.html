@@ -5,11 +5,19 @@
 
 {% block extra_css %}
 <style>
-    .candidate-card {
-        transition: transform 0.2s;
+    .list-group-item {
+        transition: background-color 0.2s ease;
+        border-left: none;
+        border-right: none;
     }
-    .candidate-card:hover {
-        transform: translateY(-2px);
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+    .list-group-item:first-child {
+        border-top: none;
+    }
+    .list-group-item:last-child {
+        border-bottom: none;
     }
     .vote-button {
         transition: all 0.3s;
@@ -19,6 +27,19 @@
     }
     .results-bar {
         transition: width 1s ease-in-out;
+    }
+    .candidate-photo {
+        border: 2px solid #e9ecef;
+        transition: border-color 0.2s ease;
+    }
+    .candidate-photo:hover {
+        border-color: #0d6efd;
+    }
+    .candidate-name-link {
+        transition: color 0.2s ease;
+    }
+    .candidate-name-link:hover {
+        color: #0d6efd !important;
     }
 </style>
 {% endblock %}
@@ -68,110 +89,88 @@
         </div>
 
         <!-- Candidates -->
-        <div class="row">
-            {% for candidate in candidates %}
-                <div class="col-md-6 mb-4">
-                    <div class="card candidate-card h-100 shadow-sm">
-                        {% if candidate.main_photo %}
-                            <img src="{{ candidate.main_photo.url }}" class="card-img-top" alt="{{ candidate.name }}" style="height: 200px; object-fit: cover;">
-                        {% else %}
-                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
-                                <i class="bi bi-person display-4 text-muted"></i>
-                            </div>
-                        {% endif %}
-                        
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h5 class="card-title mb-0">{{ candidate.name }}</h5>
-                                {% if candidate.is_premium %}
-                                    <span class="badge bg-warning">
-                                        <i class="bi bi-star"></i> Premium
-                                    </span>
-                                {% endif %}
-                            </div>
-                            
-                            <p class="card-text text-muted small">
-                                <i class="bi bi-person-badge"></i> 
-                                {{ candidate.get_candidate_type_display }}
-                            </p>
-                            
-                            <p class="card-text">{{ candidate.description|truncatewords:15 }}</p>
-                            
-                            <!-- Results -->
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <small class="text-muted">Wynik:</small>
-                                    <small class="text-muted">{{ candidate.vote_count }} głosów ({{ candidate.vote_percentage }}%)</small>
-                                </div>
-                                <div class="progress" style="height: 8px;">
-                                    <div class="progress-bar" role="progressbar" 
-                                         style="width: {{ candidate.vote_percentage }}%;" 
-                                         aria-valuenow="{{ candidate.vote_percentage }}" 
-                                         aria-valuemin="0" aria-valuemax="100">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="d-flex gap-2">
-                                <a href="{% url 'polls:candidate_detail' candidate.id %}" class="btn btn-outline-primary btn-sm flex-fill">
-                                    <i class="bi bi-eye"></i> Szczegóły
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                                            <i class="bi bi-people"></i> Kandydaci
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for candidate in candidates %}
+                        <div class="list-group-item d-flex align-items-center py-3" data-candidate-id="{{ candidate.id }}">
+                            <!-- Candidate Photo/Icon -->
+                            <div class="me-3">
+                                <a href="{% url 'polls:candidate_detail' candidate.id %}" class="text-decoration-none">
+                                    {% if candidate.main_photo %}
+                                        <img src="{{ candidate.main_photo.url }}" 
+                                             alt="{{ candidate.name }}" 
+                                             class="rounded-circle candidate-photo" 
+                                             style="width: 50px; height: 50px; object-fit: cover;">
+                                    {% else %}
+                                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center candidate-photo" 
+                                             style="width: 50px; height: 50px;">
+                                            <i class="bi bi-person text-muted"></i>
+                                        </div>
+                                    {% endif %}
                                 </a>
+                            </div>
+                            
+                            <!-- Candidate Info -->
+                            <div class="flex-grow-1 me-3">
+                                <div class="d-flex align-items-center mb-1">
+                                    <a href="{% url 'polls:candidate_detail' candidate.id %}" class="text-decoration-none candidate-name-link">
+                                        <h6 class="mb-0 me-2 text-dark">{{ candidate.name }}</h6>
+                                    </a>
+
+                                </div>
+                                <small class="text-muted">
+                                    <i class="bi bi-person-badge"></i> 
+                                    {{ candidate.get_candidate_type_display }}
+                                </small>
                                 
+                                <!-- Results -->
+                                <div class="mt-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">Wynik:</small>
+                                        <small class="text-muted">{{ candidate.vote_count }} głosów ({{ candidate.vote_percentage }}%)</small>
+                                    </div>
+                                                                         <div class="progress" style="height: 6px;">
+                                                                                   <!-- Debug: {{ candidate.name }} - votes: {{ candidate.vote_count }}, total: {{ total_votes }}, width: {{ candidate.proportional_width|default:"NOT SET" }} -->
+                                         <div class="progress-bar" role="progressbar" 
+                                              style="width: {{ candidate.proportional_width|default:0|floatformat:0 }}%;" 
+                                              aria-valuenow="{{ candidate.vote_count }}" 
+                                              aria-valuemin="0" aria-valuemax="{{ max_votes }}">
+                                         </div>
+                                     </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Buttons -->
+                            <div class="d-flex gap-2" style="min-width: 80px;">
                                 {% if event.is_active %}
                                     {% if not has_voted %}
-                                        <button class="btn btn-success btn-sm vote-button flex-fill" 
+                                        <button class="btn btn-success btn-sm vote-button" 
                                                 onclick="voteForCandidate('{{ candidate.id }}')"
-                                                data-candidate-id="{{ candidate.id }}">
+                                                data-candidate-id="{{ candidate.id }}"
+                                                style="width: 80px;">
                                             <i class="bi bi-check-circle"></i> Głosuj
                                         </button>
                                     {% elif user_vote.candidate.id == candidate.id %}
-                                        <button class="btn btn-warning btn-sm vote-button flex-fill" disabled>
-                                            <i class="bi bi-check-circle"></i> Twój głos
-                                        </button>
+                                        <div class="d-flex align-items-center justify-content-center" style="width: 80px;">
+                                            <i class="bi bi-check-circle-fill text-success" style="font-size: 1.2rem;"></i>
+                                        </div>
                                     {% endif %}
                                 {% endif %}
                             </div>
                         </div>
-                    </div>
+                    {% endfor %}
                 </div>
-            {% endfor %}
+            </div>
         </div>
     </div>
     
     <div class="col-lg-4">
-        <!-- Live Results -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="bi bi-graph-up"></i> Wyniki na żywo
-                </h5>
-            </div>
-            <div class="card-body" id="live-results">
-                {% for result in results %}
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <strong>{{ result.candidate.name }}</strong>
-                            <span class="badge bg-primary">{{ result.percentage }}%</span>
-                        </div>
-                        <div class="progress" style="height: 10px;">
-                            <div class="progress-bar" role="progressbar" 
-                                 style="width: {{ result.percentage }}%;" 
-                                 aria-valuenow="{{ result.percentage }}" 
-                                 aria-valuemin="0" aria-valuemax="100">
-                            </div>
-                        </div>
-                        <small class="text-muted">{{ result.vote_count }} głosów</small>
-                    </div>
-                {% endfor %}
-                
-                <div class="text-center mt-3">
-                    <small class="text-muted">
-                        <i class="bi bi-clock"></i> Ostatnia aktualizacja: <span id="last-update">{{ event.updated_at|date:"H:i:s" }}</span>
-                    </small>
-                </div>
-            </div>
-        </div>
-        
         <!-- Voting Info -->
         {% if not has_voted and event.is_active %}
             <div class="card">
@@ -247,14 +246,12 @@ document.addEventListener('DOMContentLoaded', function() {
     voteModal = new bootstrap.Modal(document.getElementById('voteModal'));
     
     // Auto-refresh results every 30 seconds
-    if (document.querySelector('#live-results')) {
-        setInterval(refreshResults, 30000);
-    }
+    setInterval(refreshResults, 30000);
 });
 
 function voteForCandidate(candidateId) {
     selectedCandidateId = candidateId;
-    const candidateName = document.querySelector(`[data-candidate-id="${candidateId}"]`).closest('.card').querySelector('.card-title').textContent;
+    const candidateName = document.querySelector(`[data-candidate-id="${candidateId}"]`).closest('.list-group-item').querySelector('h6').textContent;
     document.getElementById('candidate-name').textContent = candidateName;
     voteModal.show();
 }
@@ -286,17 +283,27 @@ document.getElementById('confirm-vote').addEventListener('click', function() {
             // Show success message
             showAlert(data.message, 'success');
             
-            // Wait a moment for the server to process, then refresh results
+            console.log('Vote successful, refreshing results...'); // Debug log
+            
+            // Refresh results immediately after successful vote
             setTimeout(() => {
                 refreshResults();
-            }, 500);
+            }, 100);
             
-            // Disable voting buttons for new vote
+            // Disable voting buttons for new vote and show green check for selected candidate
             document.querySelectorAll('.vote-button').forEach(btn => {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="bi bi-check-circle"></i> Głos oddany';
-                btn.classList.remove('btn-success');
-                btn.classList.add('btn-secondary');
+                if (btn.getAttribute('data-candidate-id') === selectedCandidateId) {
+                    // Replace button with green check icon for selected candidate
+                    const buttonContainer = btn.closest('.d-flex');
+                    buttonContainer.innerHTML = `
+                        <div class="d-flex align-items-center justify-content-center" style="width: 80px;">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size: 1.2rem;"></i>
+                        </div>
+                    `;
+                } else {
+                    // Hide other buttons completely
+                    btn.style.display = 'none';
+                }
             });
             
             // Show voted message
@@ -379,67 +386,58 @@ function refreshResults() {
     fetch(`{% url 'polls:get_results' event.id %}`)
     .then(response => response.json())
     .then(data => {
-        // Update live results sidebar
-        const resultsContainer = document.getElementById('live-results');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '';
-            
-            data.results.forEach(result => {
-                const resultHtml = `
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <strong>${result.name}</strong>
-                            <span class="badge bg-primary">${result.percentage}%</span>
-                        </div>
-                        <div class="progress" style="height: 10px;">
-                            <div class="progress-bar" role="progressbar" 
-                                 style="width: ${result.percentage}%;" 
-                                 aria-valuenow="${result.percentage}" 
-                                 aria-valuemin="0" aria-valuemax="100">
-                            </div>
-                        </div>
-                        <small class="text-muted">${result.vote_count} głosów</small>
-                    </div>
-                `;
-                resultsContainer.innerHTML += resultHtml;
-            });
-        }
+        console.log('Refreshing results:', data); // Debug log
         
-        // Update candidate cards results
+        // Update candidate list results
         data.results.forEach(result => {
-            const candidateCard = document.querySelector(`[data-candidate-id="${result.id}"]`);
-            if (candidateCard) {
-                const card = candidateCard.closest('.card');
-                if (card) {
-                    // Update vote count and percentage text
-                    const voteCountElements = card.querySelectorAll('.text-muted');
-                    for (let element of voteCountElements) {
-                        if (element.textContent.includes('głosów') && element.textContent.includes('(')) {
-                            element.textContent = `${result.vote_count} głosów (${result.percentage}%)`;
-                            break;
-                        }
-                    }
-                    
-                    // Update progress bar
-                    const progressBar = card.querySelector('.progress-bar');
-                    if (progressBar) {
-                        progressBar.style.width = `${result.percentage}%`;
-                        progressBar.setAttribute('aria-valuenow', result.percentage);
-                    }
+            console.log(`Updating candidate ${result.name} with ${result.vote_count} votes`); // Debug log
+            
+            // Find the candidate list item by data-candidate-id
+            const listItem = document.querySelector(`.list-group-item[data-candidate-id="${result.id}"]`);
+            if (!listItem) {
+                console.log(`List item not found for candidate ${result.name} (ID: ${result.id})`); // Debug log
+                return;
+            }
+            
+            // Update vote count and percentage text
+            const voteCountElements = listItem.querySelectorAll('.text-muted');
+            let updated = false;
+            for (let element of voteCountElements) {
+                if (element.textContent.includes('głosów') && element.textContent.includes('(')) {
+                    const oldText = element.textContent;
+                    element.textContent = `${result.vote_count} głosów (${result.percentage}%)`;
+                    console.log(`Updated vote count: ${oldText} -> ${element.textContent}`); // Debug log
+                    updated = true;
+                    break;
                 }
+            }
+            
+            if (!updated) {
+                console.log(`Vote count element not found for ${result.name}`); // Debug log
+            }
+            
+            // Update progress bar with proportional width (relative to total votes)
+            const progressBar = listItem.querySelector('.progress-bar');
+            if (progressBar) {
+                const proportionalWidth = data.total_votes > 0 ? (result.vote_count / data.total_votes * 100) : 0;
+                const oldWidth = progressBar.style.width;
+                progressBar.style.width = `${proportionalWidth}%`;
+                progressBar.setAttribute('aria-valuenow', result.vote_count);
+                progressBar.setAttribute('aria-valuemax', data.total_votes);
+                console.log(`Updated progress bar: ${oldWidth} -> ${progressBar.style.width}`); // Debug log
+            } else {
+                console.log(`Progress bar not found for ${result.name}`); // Debug log
             }
         });
         
         // Update total votes in header
         const totalVotesElement = document.querySelector('.badge.bg-primary');
         if (totalVotesElement && totalVotesElement.textContent.includes('głosów')) {
+            const oldText = totalVotesElement.innerHTML;
             totalVotesElement.innerHTML = `<i class="bi bi-check-circle"></i> ${data.total_votes} głosów`;
-        }
-        
-        // Update last update time
-        const lastUpdateElement = document.getElementById('last-update');
-        if (lastUpdateElement) {
-            lastUpdateElement.textContent = new Date().toLocaleTimeString();
+            console.log(`Updated total votes: ${oldText} -> ${totalVotesElement.innerHTML}`); // Debug log
+        } else {
+            console.log('Total votes element not found'); // Debug log
         }
     })
     .catch(error => {

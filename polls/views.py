@@ -41,6 +41,11 @@ def home(request):
                 active_and_upcoming.append(event)
                 upcoming_events.append(event)
     
+    # Upewnij się, że lista jest posortowana rosnąco po dacie (najbliższa data pierwsza)
+    active_and_upcoming.sort(key=lambda x: x.event_date)
+    active_events.sort(key=lambda x: x.event_date)
+    upcoming_events.sort(key=lambda x: x.event_date)
+    
     # Paginacja
     paginator = Paginator(active_and_upcoming, 10)
     page_number = request.GET.get('page')
@@ -81,11 +86,27 @@ def event_detail(request, event_id):
     # Sortuj wyniki malejąco
     results.sort(key=lambda x: x['vote_count'], reverse=True)
     
+    # Sortuj kandydatów według liczby głosów (od największej do najmniejszej)
+    sorted_candidates = sorted(candidates, key=lambda c: c.vote_count, reverse=True)
+    
+    # Oblicz maksymalną liczbę głosów dla proporcjonalnego wypełnienia pasków
+    max_votes = max([c.vote_count for c in candidates]) if candidates else 0
+    
+    # Oblicz proporcjonalne wypełnienie pasków dla każdego kandydata (względem całkowitej liczby głosów)
+    for candidate in sorted_candidates:
+        if total_votes > 0:
+            setattr(candidate, 'proportional_width', (candidate.vote_count / total_votes) * 100)
+        else:
+            setattr(candidate, 'proportional_width', 0)
+        print(f"Candidate {candidate.name}: {candidate.vote_count} votes, total_votes: {total_votes}, proportional_width: {getattr(candidate, 'proportional_width', 'NOT SET')}")  # Debug log
+    
     context = {
         'event': event,
-        'candidates': candidates,
+        'candidates': sorted_candidates,
         'results': results,
         'total_votes': total_votes,
+        'max_votes': max_votes,
+
         'has_voted': has_voted,
         'user_vote': user_vote,
         'client_ip': client_ip,
@@ -124,11 +145,18 @@ def vote(request, event_id):
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
         )
         
+        print(f"Vote created: {vote.id} for candidate {candidate.name}")  # Debug log
+        
         # Aktualizuj analitykę
         analytics, created = PollAnalytics.objects.get_or_create(event=event)
         analytics.total_votes = event.votes.count()
         analytics.unique_voters = event.votes.values('ip_address').distinct().count()
         analytics.save()
+        
+        # Sprawdź aktualną liczbę głosów
+        current_vote_count = candidate.vote_count
+        total_votes = event.votes.count()
+        print(f"Current vote count for {candidate.name}: {current_vote_count}, Total: {total_votes}")  # Debug log
         
         return JsonResponse({
             'success': True,
@@ -267,30 +295,45 @@ def get_results(request, event_id):
             'percentage': round(percentage, 2)
         })
     
-    return JsonResponse({
+    response_data = {
         'results': results,
         'total_votes': total_votes,
         'last_updated': timezone.now().isoformat()
-    })
+    }
+    
+    print(f"API Response: {response_data}")  # Debug log
+    
+    return JsonResponse(response_data)
 
 
 def candidate_detail(request, candidate_id):
     """Profil kandydata/partii"""
     candidate = get_object_or_404(Candidate, id=candidate_id)
-    comments = candidate.comments.filter(is_approved=True)
+    comments = candidate.comments.all()
+    
+
+    
+
     
     if request.method == 'POST':
-        form = CommentForm(request.POST)
+        form = CommentForm(request.POST, user=request.user)
         if form.is_valid():
             comment = form.save(commit=False)
             comment.candidate = candidate
             comment.ip_address = get_client_ip(request)
+            comment.is_approved = True  # Automatycznie zatwierdzony
+            
+            # Ustaw autora jeśli użytkownik jest zalogowany
+            if request.user.is_authenticated:
+                comment.author = request.user
+                comment.author_email = request.user.email
+            
             comment.save()
             
-            messages.success(request, 'Komentarz został dodany i oczekuje na zatwierdzenie.')
-            return redirect('candidate_detail', candidate_id=candidate_id)
+            messages.success(request, 'Komentarz został dodany.')
+            return redirect('polls:candidate_detail', candidate_id=candidate_id)
     else:
-        form = CommentForm()
+        form = CommentForm(user=request.user)
     
     context = {
         'candidate': candidate,
@@ -497,28 +540,7 @@ def export_results(request, event_id):
     return response
 
 
-@staff_member_required
-def moderate_comments(request):
-    """Moderacja komentarzy"""
-    pending_comments = Comment.objects.filter(is_approved=False).order_by('-created_at')
-    approved_comments = Comment.objects.filter(is_approved=True).order_by('-created_at')[:20]
-    
-    context = {
-        'pending_comments': pending_comments,
-        'approved_comments': approved_comments,
-    }
-    return render(request, 'polls/admin/moderate_comments.html', context)
 
-
-@staff_member_required
-@require_POST
-def approve_comment(request, comment_id):
-    """Zatwierdzanie komentarza"""
-    comment = get_object_or_404(Comment, id=comment_id)
-    comment.is_approved = True
-    comment.save()
-    messages.success(request, 'Komentarz został zatwierdzony.')
-    return redirect('polls:moderate_comments')
 
 
 @staff_member_required
@@ -527,6 +549,11 @@ def delete_comment(request, comment_id):
     """Usuwanie komentarza"""
     comment = get_object_or_404(Comment, id=comment_id)
     comment.delete()
+    
+    # Sprawdź czy to jest AJAX request
+    if request.headers.get('Content-Type') == 'application/json':
+        return JsonResponse({'success': True, 'message': 'Komentarz został usunięty.'})
+    
     messages.success(request, 'Komentarz został usunięty.')
     return redirect('polls:moderate_comments')
 
